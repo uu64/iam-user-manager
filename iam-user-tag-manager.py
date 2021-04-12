@@ -19,21 +19,22 @@ def load_user_tags(filename: str) -> List:
         raise e
 
 
-def main():
-    iam = boto3.client('iam')
+def main() -> None:
     user_tags = load_user_tags(FILE_NAME)
 
-    try:
-        for user in iam.list_users()['Users']:
-            name = user['UserName']
-            if name in user_tags['users']:
-                tags = user_tags['users'][name]
-                print('{}: has tags {}'.format(name, tags))
+    client = boto3.client('iam')
+    for user in user_tags['Users']:
+        try:
+            client.tag_user(UserName=user['Name'], Tags=user['Tags'])
+        except botocore.exceptions.ClientError as error:
+            error_code = error.response['Error']['Code']
+            if error_code == 'NoSuchEntity':
+                print('{}: does not exist'.format(user['Name']))
+                continue
             else:
-                print('{}: does not exist in \'{}\''.format(name, FILE_NAME))
-    except botocore.exceptions.ClientError as error:
-        traceback.print_exc()
-        raise error
+                raise error
+
+    print('finished')
 
 if __name__ == '__main__':
     main()
