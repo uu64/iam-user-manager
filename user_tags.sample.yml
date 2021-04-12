@@ -1,0 +1,5 @@
+users:
+  John Smith:
+    tags:
+      - key: nickname
+        value: John
