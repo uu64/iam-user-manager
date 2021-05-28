@@ -3,6 +3,7 @@
 import boto3
 import botocore
 import click
+import sys
 import traceback
 import yaml
 from cerberus import Validator
@@ -45,12 +46,20 @@ def load_template(file_path: str) -> List:
             template = yaml.safe_load(file)
 
         v = Validator(template_schema.schema)
-        print(v.validate(template))
+        if not v.validate(template):
+            exit_failure('template format is wrong: {}'.format(file_path))
 
         return template
-    except Exception as e:
-        traceback.print_exc()
-        raise e
+    except yaml.YAMLError:
+        exit_failure('invalid yaml file: {}'.format(file_path))
+    except FileNotFoundError:
+        exit_failure('no such file: {}'.format(file_path))
+
+
+
+def exit_failure(message: str) -> None:
+    print('[Error] {}'.format(message), file=sys.stderr)
+    sys.exit(1)
 
 
 def main() -> None:
