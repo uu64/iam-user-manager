@@ -2,6 +2,9 @@
 
 import boto3
 import click
+import csv
+import secrets
+import string
 import sys
 import traceback
 import yaml
@@ -40,6 +43,7 @@ def delete(template_path: str) -> None:
     """
     Deletes all iam users listed in the template file.
     """
+    # TODO: implement
     print('delete: ' + template_path)
 
 
@@ -69,6 +73,11 @@ def load_users(file_path: str) -> List[User]:
 def update_user(user: User) -> None:
     try:
         client.create_user(UserName=user.name)
+        password = generate_password(8)
+        client.create_login_profile(
+            UserName=user.name, Password=password, PasswordResetRequired=True)
+        output_user_profile(user.name, password)
+
     except exceptions.ClientError as e:
         if e.response['Error']['Code'] == 'EntityAlreadyExists':
             # do nothing
@@ -100,6 +109,30 @@ def update_user_group(user: User) -> None:
             if group_name in user.groups:
                 continue
             client.remove_user_from_group(UserName=user.name, GroupName=group_name)
+    except Exception as e:
+        exit_failure(''.join(traceback.format_exception_only(type(e), e)))
+
+
+def generate_password(count: int) -> str:
+    characters = string.ascii_letters + string.digits
+    while True:
+        password = ''.join(secrets.choice(characters) for i in range(count))
+        if (any(c.islower() for c in password)
+                and any(c.isupper() for c in password)
+                and any(c.isdigit() for c in password)):
+            break
+    return password
+
+
+def output_user_profile(user_name, password):
+    try:
+        # TODO: call only once
+        account_id = boto3.client('sts').get_caller_identity().get('Account')
+        with open('{}.csv'.format(user_name), 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['username', 'password', 'url'])
+            writer.writerow([user_name, password,
+                'https://{}.signin.aws.amazon.com/console'.format(account_id)])
     except Exception as e:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
