@@ -8,9 +8,10 @@ import yaml
 from boto3_type_annotations.iam import Client
 from botocore import exceptions
 from cerberus import Validator
-from typing import Dict, List
+from typing import List
 
 import template_schema
+from user import User
 
 
 client: Client = boto3.client('iam')
@@ -27,10 +28,10 @@ def update(template_path: str) -> None:
     """
     Creates/Updates iam users based on the template file.
     """
-    template = load_template(template_path)
-    for data in template['Users']:
-        update_user(data['Name'], data['Tags'] if 'Tags' in data else [])
-        update_user_group(data['Name'], data['Groups'] if 'Groups' in data else [])
+    users = load_users(template_path)
+    for user in users:
+        update_user(user)
+        update_user_group(user)
 
 
 @cli.command()
@@ -42,7 +43,7 @@ def delete(template_path: str) -> None:
     print('delete: ' + template_path)
 
 
-def load_template(file_path: str) -> List[Dict]:
+def load_users(file_path: str) -> List[User]:
     try:
         with open(file_path) as file:
             template = yaml.safe_load(file)
@@ -51,14 +52,23 @@ def load_template(file_path: str) -> List[Dict]:
         if not v.validate(template):
             exit_failure('template format is wrong: {}'.format(file_path))
 
-        return template
+        users = []
+        for data in template.get('Users'):
+            user = User(
+                data.get('Name'),
+                data.get('Tags', {}),
+                data.get('Groups', [])
+            )
+            users.append(user)
+
+        return users
     except Exception as e:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
 
-def update_user(user_name: str, tags: List[Dict]) -> None:
+def update_user(user: User) -> None:
     try:
-        client.create_user(UserName=user_name)
+        client.create_user(UserName=user.name)
     except exceptions.ClientError as e:
         if e.response['Error']['Code'] == 'EntityAlreadyExists':
             # do nothing
@@ -68,27 +78,28 @@ def update_user(user_name: str, tags: List[Dict]) -> None:
     except Exception as e:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
+    tags = [{'Key': k, 'Value': v} for k, v in user.tags.items()]
     if tags:
         try:
-            client.tag_user(UserName=user_name, Tags=tags)
+            client.tag_user(UserName=user.name, Tags=tags)
         except Exception as e:
             exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
 
-def update_user_group(user_name: str, groups: List[str]) -> None:
+def update_user_group(user: User) -> None:
     try:
-        res = client.list_groups_for_user(UserName=user_name)
+        res = client.list_groups_for_user(UserName=user.name)
         current = list(map(lambda x: x['GroupName'], res['Groups']))
 
-        for group_name in groups:
+        for group_name in user.groups:
             if group_name in current:
                 continue
-            client.add_user_to_group(UserName=user_name, GroupName=group_name)
+            client.add_user_to_group(UserName=user.name, GroupName=group_name)
 
         for group_name in current:
-            if group_name in groups:
+            if group_name in user.groups:
                 continue
-            client.remove_user_from_group(UserName=user_name, GroupName=group_name)
+            client.remove_user_from_group(UserName=user.name, GroupName=group_name)
     except Exception as e:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 

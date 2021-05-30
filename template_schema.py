@@ -14,21 +14,13 @@ schema = {
                     'required': True
                 },
                 'Tags': {
-                    'type': 'list',
+                    'type': 'dict',
                     'required': False,
-                    'schema': {
-                        'type': 'dict',
-                        'required': True,
-                        'schema': {
-                            'Key': {
-                                'type': 'string',
-                                'required': True
-                            },
-                            'Value': {
-                                'type': 'string',
-                                'required': True
-                            }
-                        }
+                    'keysrules': {
+                        'type': 'string'
+                    },
+                    'valuesrules': {
+                        'type': 'string'
                     }
                 },
                 'Groups': {

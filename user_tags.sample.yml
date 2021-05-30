@@ -1,5 +1,4 @@
 Users:
   - Name: JohnSmith
     Tags:
-      - Key: nickname
-        Value: John
+      nickname: John
