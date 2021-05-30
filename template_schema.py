@@ -30,6 +30,14 @@ schema = {
                             }
                         }
                     }
+                },
+                'Groups': {
+                    'type': 'list',
+                    'required': False,
+                    'schema': {
+                        'type': 'string',
+                        'required': True
+                    }
                 }
             }
         }
