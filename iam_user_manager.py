@@ -33,7 +33,8 @@ def update(template_path: str) -> None:
     """
     users = load_users(template_path)
     for user in users:
-        update_user(user)
+        create_user(user)
+        tag_user(user)
         update_user_group(user)
 
 
@@ -70,7 +71,7 @@ def load_users(file_path: str) -> List[User]:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
 
-def update_user(user: User) -> None:
+def create_user(user: User) -> None:
     try:
         client.create_user(UserName=user.name)
         password = generate_password(8)
@@ -87,8 +88,13 @@ def update_user(user: User) -> None:
     except Exception as e:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
-    tags = [{'Key': k, 'Value': v} for k, v in user.tags.items()]
-    if tags:
+
+def tag_user(user: User) -> None:
+    res = client.list_user_tags(UserName=user.name)
+    current = {d['Key']: d['Value'] for d in res['Tags']}
+
+    if not current.items() >= user.tags.items():
+        tags = [{'Key': k, 'Value': v} for k, v in user.tags.items()]
         try:
             client.tag_user(UserName=user.name, Tags=tags)
         except Exception as e:

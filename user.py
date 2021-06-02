@@ -9,6 +9,6 @@ class User:
 
     def __init__(self, name: str, tags: Dict[str, str], groups: List[str]):
         self.name = name
-        self.tags = tags
-        self.groups = groups
+        self.tags = tags if tags else {}
+        self.groups = groups if groups else []
 
