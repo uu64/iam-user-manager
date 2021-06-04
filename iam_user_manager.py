@@ -33,9 +33,19 @@ def update(template_path: str) -> None:
     """
     users = load_users(template_path)
     for user in users:
-        create_user(user)
-        tag_user(user)
-        update_user_group(user)
+        is_created = create_user(user)
+        is_tagged = tag_user(user)
+        is_updated = update_user_group(user)
+
+        print('{}:'.format(user.name))
+        if is_created:
+            print('IAM user is created.')
+        if is_tagged:
+            print('User\'s tags are changed.')
+        if is_updated:
+            print('IAM group is updated.')
+        if not is_created or is_tagged or is_updated:
+            print('Nothing is changed.')
 
 
 @cli.command()
@@ -71,9 +81,11 @@ def load_users(file_path: str) -> List[User]:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
 
-def create_user(user: User) -> None:
+def create_user(user: User) -> bool:
+    is_created = False
     try:
         client.create_user(UserName=user.name)
+        is_created = True
         password = generate_password(8)
         client.create_login_profile(
             UserName=user.name, Password=password, PasswordResetRequired=True)
@@ -88,8 +100,12 @@ def create_user(user: User) -> None:
     except Exception as e:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
+    return is_created
 
-def tag_user(user: User) -> None:
+
+def tag_user(user: User) -> bool:
+    is_tagged = False
+
     res = client.list_user_tags(UserName=user.name)
     current = {d['Key']: d['Value'] for d in res['Tags']}
 
@@ -97,11 +113,15 @@ def tag_user(user: User) -> None:
         tags = [{'Key': k, 'Value': v} for k, v in user.tags.items()]
         try:
             client.tag_user(UserName=user.name, Tags=tags)
+            is_tagged = True
         except Exception as e:
             exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
+    return is_tagged
 
-def update_user_group(user: User) -> None:
+
+def update_user_group(user: User) -> bool:
+    is_updated = False
     try:
         res = client.list_groups_for_user(UserName=user.name)
         current = list(map(lambda x: x['GroupName'], res['Groups']))
@@ -110,13 +130,17 @@ def update_user_group(user: User) -> None:
             if group_name in current:
                 continue
             client.add_user_to_group(UserName=user.name, GroupName=group_name)
+            is_updated = True
 
         for group_name in current:
             if group_name in user.groups:
                 continue
             client.remove_user_from_group(UserName=user.name, GroupName=group_name)
+            is_updated = True
+
     except Exception as e:
         exit_failure(''.join(traceback.format_exception_only(type(e), e)))
+    return is_updated
 
 
 def generate_password(count: int) -> str:
