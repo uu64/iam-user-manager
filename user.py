@@ -2,6 +2,7 @@
 
 from typing import Dict, List
 
+
 class User:
     name: str
     tags: Dict[str, str]
@@ -11,4 +12,3 @@ class User:
         self.name = name
         self.tags = tags if tags else {}
         self.groups = groups if groups else []
-
