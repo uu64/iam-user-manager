@@ -2,3 +2,5 @@ Users:
   - Name: JohnSmith
     Tags:
       nickname: John
+    Groups:
+      - Developer
