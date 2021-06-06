@@ -31,13 +31,23 @@ def update(template_path: str) -> None:
     """
     Creates/Updates iam users based on the template file.
     """
-    users = load_users(template_path)
-    for user in users:
-        is_created = create_user(user)
-        is_tagged = tag_user(user)
-        is_group_updated = update_user_group(user)
+    try:
+        users = load_users(template_path)
+    except Exception as e:
+        exit_failure(''.join(traceback.format_exception_only(type(e), e)))
 
-        show_message(user, is_created, is_tagged, is_group_updated)
+    for user in users:
+        print('{}:'.format(user.name))
+        is_created = is_tagged = is_group_updated = False
+        try:
+            is_created = create_user(user)
+            is_tagged = tag_user(user)
+            is_group_updated = update_user_group(user)
+        except Exception as e:
+            exit_failure(''.join(traceback.format_exception_only(type(e), e)))
+        finally:
+            show_result(user, is_created, is_tagged, is_group_updated)
+            print()
 
 
 @cli.command()
@@ -50,8 +60,7 @@ def delete(template_path: str) -> None:
     print('delete: ' + template_path)
 
 
-def show_message(user: User, is_created: bool, is_tagged: bool, is_group_updated: bool) -> None:
-    print('{}:'.format(user.name))
+def show_result(user: User, is_created: bool, is_tagged: bool, is_group_updated: bool) -> None:
     if is_created:
         print('IAM user {} has been created.'.format(user.name))
     if is_tagged:
@@ -60,34 +69,31 @@ def show_message(user: User, is_created: bool, is_tagged: bool, is_group_updated
         print('The group to which {} belongs has been changed.'.format(user.name))
     if not (is_created or is_tagged or is_group_updated):
         print('No changes.')
-    print()
 
 
 def load_users(file_path: str) -> List[User]:
-    try:
-        with open(file_path) as file:
-            template = yaml.safe_load(file)
+    with open(file_path) as file:
+        template = yaml.safe_load(file)
 
-        v = Validator(template_schema.schema)
-        if not v.validate(template):
-            exit_failure('template format is wrong: {}'.format(file_path))
+    v = Validator(template_schema.schema)
+    if not v.validate(template):
+        exit_failure('template format is wrong: {}'.format(file_path))
 
-        users = []
-        for data in template.get('Users'):
-            user = User(
-                data.get('Name'),
-                data.get('Tags', {}),
-                data.get('Groups', [])
-            )
-            users.append(user)
+    users = []
+    for data in template.get('Users'):
+        user = User(
+            data.get('Name'),
+            data.get('Tags', {}),
+            data.get('Groups', [])
+        )
+        users.append(user)
 
-        return users
-    except Exception as e:
-        exit_failure(''.join(traceback.format_exception_only(type(e), e)))
+    return users
 
 
 def create_user(user: User) -> bool:
     is_created = False
+
     try:
         client.create_user(UserName=user.name)
         is_created = True
@@ -101,9 +107,7 @@ def create_user(user: User) -> bool:
             # do nothing
             pass
         else:
-            exit_failure(''.join(traceback.format_exception_only(type(e), e)))
-    except Exception as e:
-        exit_failure(''.join(traceback.format_exception_only(type(e), e)))
+            raise e
 
     return is_created
 
@@ -116,35 +120,30 @@ def tag_user(user: User) -> bool:
 
     if not current.items() >= user.tags.items():
         tags = [{'Key': k, 'Value': v} for k, v in user.tags.items()]
-        try:
-            client.tag_user(UserName=user.name, Tags=tags)
-            is_tagged = True
-        except Exception as e:
-            exit_failure(''.join(traceback.format_exception_only(type(e), e)))
+        client.tag_user(UserName=user.name, Tags=tags)
+        is_tagged = True
 
     return is_tagged
 
 
 def update_user_group(user: User) -> bool:
     is_updated = False
-    try:
-        res = client.list_groups_for_user(UserName=user.name)
-        current = list(map(lambda x: x['GroupName'], res['Groups']))
 
-        for group_name in user.groups:
-            if group_name in current:
-                continue
-            client.add_user_to_group(UserName=user.name, GroupName=group_name)
-            is_updated = True
+    res = client.list_groups_for_user(UserName=user.name)
+    current = list(map(lambda x: x['GroupName'], res['Groups']))
 
-        for group_name in current:
-            if group_name in user.groups:
-                continue
-            client.remove_user_from_group(UserName=user.name, GroupName=group_name)
-            is_updated = True
+    for group_name in user.groups:
+        if group_name in current:
+            continue
+        client.add_user_to_group(UserName=user.name, GroupName=group_name)
+        is_updated = True
 
-    except Exception as e:
-        exit_failure(''.join(traceback.format_exception_only(type(e), e)))
+    for group_name in current:
+        if group_name in user.groups:
+            continue
+        client.remove_user_from_group(UserName=user.name, GroupName=group_name)
+        is_updated = True
+
     return is_updated
 
 
