@@ -35,17 +35,9 @@ def update(template_path: str) -> None:
     for user in users:
         is_created = create_user(user)
         is_tagged = tag_user(user)
-        is_updated = update_user_group(user)
+        is_group_updated = update_user_group(user)
 
-        print('{}:'.format(user.name))
-        if is_created:
-            print('IAM user is created.')
-        if is_tagged:
-            print('User\'s tags are changed.')
-        if is_updated:
-            print('IAM group is updated.')
-        if not is_created or is_tagged or is_updated:
-            print('Nothing is changed.')
+        show_message(user, is_created, is_tagged, is_group_updated)
 
 
 @cli.command()
@@ -56,6 +48,19 @@ def delete(template_path: str) -> None:
     """
     # TODO: implement
     print('delete: ' + template_path)
+
+
+def show_message(user: User, is_created: bool, is_tagged: bool, is_group_updated: bool) -> None:
+    print('{}:'.format(user.name))
+    if is_created:
+        print('IAM user {} has been created.'.format(user.name))
+    if is_tagged:
+        print('{}\'s tags has been changed.'.format(user.name))
+    if is_group_updated:
+        print('The group to which {} belongs has been changed.'.format(user.name))
+    if not (is_created or is_tagged or is_group_updated):
+        print('No changes.')
+    print()
 
 
 def load_users(file_path: str) -> List[User]:
