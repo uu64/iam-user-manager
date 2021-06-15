@@ -11,7 +11,7 @@ import yaml
 from boto3_type_annotations.iam import Client
 from botocore import exceptions
 from cerberus import Validator
-from typing import List
+from typing import List, Tuple
 
 import template_schema
 from user import User
@@ -40,7 +40,9 @@ def update(template_path: str) -> None:
         print("{}:".format(user.name))
         is_created = is_tagged = is_group_updated = False
         try:
-            is_created = create_user(user)
+            is_created, password = create_user(user)
+            if is_created:
+                output_user_profile(user.name, password)
             is_tagged = tag_user(user)
             is_group_updated = update_user_group(user)
         except Exception as e:
@@ -89,17 +91,19 @@ def load_users(file_path: str) -> List[User]:
     return users
 
 
-def create_user(user: User) -> bool:
+def create_user(user: User) -> Tuple[bool, str]:
     is_created = False
+    password = ""
 
     try:
         client.create_user(UserName=user.name)
         is_created = True
         password = generate_password(8)
         client.create_login_profile(
-            UserName=user.name, Password=password, PasswordResetRequired=True
+            UserName=user.name,
+            Password=generate_password(8),
+            PasswordResetRequired=True,
         )
-        output_user_profile(user.name, password)
 
     except exceptions.ClientError as e:
         if e.response["Error"]["Code"] == "EntityAlreadyExists":
@@ -108,7 +112,7 @@ def create_user(user: User) -> bool:
         else:
             raise e
 
-    return is_created
+    return is_created, password
 
 
 def tag_user(user: User) -> bool:
@@ -149,7 +153,7 @@ def update_user_group(user: User) -> bool:
 def generate_password(count: int) -> str:
     characters = string.ascii_letters + string.digits
     while True:
-        password = "".join(secrets.choice(characters) for i in range(count))
+        password = "".join(secrets.choice(characters) for _ in range(count))
         if (
             any(c.islower() for c in password)
             and any(c.isupper() for c in password)
