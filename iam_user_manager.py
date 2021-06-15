@@ -99,6 +99,7 @@ def create_user(user: User) -> Tuple[bool, str]:
         client.create_user(UserName=user.name)
         is_created = True
         password = generate_password(8)
+        # NOTE: Whether the IAM user should be deleted when create_login_profile fails
         client.create_login_profile(
             UserName=user.name,
             Password=generate_password(8),
